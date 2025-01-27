@@ -507,6 +507,10 @@ class HyVideoModelLoader:
         patcher.model["auto_cpu_offload"] = auto_cpu_offload
         patcher.model["scheduler_config"] = scheduler_config
 
+        for model in mm.current_loaded_models:
+            if model._model() == patcher:
+                mm.current_loaded_models.remove(model)            
+
         return (patcher,)
 
 #region load VAE
@@ -1156,6 +1160,9 @@ class HyVideoSampler:
             cfg = 1.0
             cfg_start_percent = 0.0
             cfg_end_percent = 1.0
+        
+        if embedded_guidance_scale == 0.0:
+            embedded_guidance_scale = None
 
         generator = torch.Generator(device=torch.device("cpu")).manual_seed(seed)
 
@@ -1239,6 +1246,14 @@ class HyVideoSampler:
         #for name, param in transformer.named_parameters():
         #    print(name, param.data.device)
 
+        leapfusion_img2vid = False
+        if samples is not None:
+            input_latents = samples["samples"] * VAE_SCALING_FACTOR
+            if input_latents.shape[2] == 1:
+                leapfusion_img2vid = True
+        else:
+            input_latents = None            
+
         out_latents = model["pipe"](
             num_inference_steps=steps,
             height = target_height,
@@ -1248,7 +1263,7 @@ class HyVideoSampler:
             cfg_start_percent=cfg_start_percent,
             cfg_end_percent=cfg_end_percent,
             embedded_guidance_scale=embedded_guidance_scale,
-            latents=samples["samples"] * VAE_SCALING_FACTOR if samples is not None else None,
+            latents=input_latents,
             denoise_strength=denoise_strength,
             prompt_embed_dict=hyvid_embeds,
             generator=generator,
@@ -1259,6 +1274,7 @@ class HyVideoSampler:
             stg_end_percent=stg_args["stg_end_percent"] if stg_args is not None else 1.0,
             context_options=context_options,
             feta_args=feta_args,
+            leapfusion_img2vid = leapfusion_img2vid
         )
 
         print_memory(device)
