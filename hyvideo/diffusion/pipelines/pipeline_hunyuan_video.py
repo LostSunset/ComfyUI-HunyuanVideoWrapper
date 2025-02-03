@@ -808,19 +808,19 @@ class HunyuanVideoPipeline(DiffusionPipeline):
                     if progress_bar is not None:
                         progress_bar.update()
                     if callback is not None:
+                        if leapfusion_img2vid:
+                            callback_latent = (latent_model_input[:, :, 1:, :, :] - noise_pred[:, :, 1:, :, :] * t / 1000).detach()[0].permute(1,0,2,3)
+                        else:
+                            callback_latent = (latent_model_input - noise_pred * t / 1000).detach()[0].permute(1,0,2,3)
                         callback(
                             i, 
-                            (latent_model_input - noise_pred * t / 1000).detach()[0].permute(1,0,2,3),
+                            callback_latent,
                             None, 
                             num_inference_steps
                         )
                     else:
                         comfy_pbar.update(1)
 
-        #latents = (latents / 2 + 0.5).clamp(0, 1).cpu()
-
-        # Offload all models
-        #self.maybe_free_model_hooks()
         if leapfusion_img2vid:
-                latents[:, :, [0,], :, :] = original_latents[:, :, [0,], :, :].to(latent_model_input)
+            latents = latents[:, :, 1:, :, :]
         return latents
