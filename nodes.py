@@ -86,6 +86,14 @@ def standardize_lora_key_format(lora_sd):
         # Diffusers format
         if k.startswith('transformer.'):
             k = k.replace('transformer.', 'diffusion_model.')
+        if "img_attn.proj" in k:
+            k = k.replace("img_attn.proj", "img_attn_proj")
+        if "img_attn.qkv" in k:
+            k = k.replace("img_attn.qkv", "img_attn_qkv")
+        if "txt_attn.proj" in k:
+            k = k.replace("txt_attn.proj ", "txt_attn_proj")
+        if "txt_attn.qkv" in k:
+            k = k.replace("txt_attn.qkv", "txt_attn_qkv")
         new_sd[k] = v
     return new_sd
 
@@ -397,7 +405,7 @@ class HyVideoModelLoader:
                         lora_sd = filter_state_dict_by_blocks(lora_sd, l["blocks"])
 
                     #for k in lora_sd.keys():
-                     #   print(k)
+                    #   print(k)
 
                     patcher, _ = load_lora_for_models(patcher, None, lora_sd, lora_strength, 0)
 
@@ -1263,12 +1271,12 @@ class HyVideoSampler:
         #    print(name, param.data.device)
 
         leapfusion_img2vid = False
-        if samples is not None:
-            input_latents = samples["samples"] * VAE_SCALING_FACTOR
+        input_latents = samples["samples"].clone() if samples is not None else None
+        if input_latents is not None:
             if input_latents.shape[2] == 1:
                 leapfusion_img2vid = True
-        else:
-            input_latents = None            
+            if denoise_strength < 1.0:
+                input_latents *= VAE_SCALING_FACTOR
 
         out_latents = model["pipe"](
             num_inference_steps=steps,
